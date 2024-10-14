@@ -5,6 +5,7 @@ use crate::{
     topics::{TopicKey, TopicKeyHandle, TopicKeyProvider},
 };
 use std::collections::{BTreeMap, BTreeSet};
+use json_unflattening::flattening::flatten;
 use thiserror::Error;
 use victory_time_rs::Timepoint;
 #[derive(Debug, Clone)]
@@ -61,6 +62,23 @@ impl Datastore {
         bucket.write().unwrap().add_primitive(time, value);
     }
 
+    pub fn add_json<T: TopicKeyProvider>(
+        &mut self,
+        topic: &T,
+        time: Timepoint,
+        value: serde_json::Value,
+    ) {
+
+        let out = flatten(&value).unwrap();
+        for (key, val) in out.iter() {
+            if let Some(supported_type) = Primitives::from_value(val.clone()) {
+                let suffix = TopicKey::from_str(key);
+                let new_key = topic.key().add_suffix(suffix);
+                self.add_primitive(&new_key, time.clone(), supported_type);       
+            }
+        }
+    }
+
     pub fn get_latest_primitive<T: TopicKeyProvider>(&self, topic: &T) -> Option<Primitives> {
         let topic = topic.handle();
         self.buckets
@@ -103,6 +121,9 @@ impl Datastore {
 
 #[cfg(test)]
 mod tests {
+    use serde::{Deserialize, Serialize};
+    use serde_json::json;
+
     use crate::database::*;
 
     #[test]
@@ -148,5 +169,56 @@ mod tests {
         assert_eq!(datapoints.len(), 1);
         assert_eq!(datapoints[0].time, time.clone().into());
         assert_eq!(datapoints[0].value, 42.into());
+    }
+    #[derive(Serialize, Deserialize)]
+    struct TestInnerStruct{
+        a: i32,
+        b: f64,
+        c: String,
+        d: bool,
+    }
+    #[derive(Serialize, Deserialize)]
+    struct TestStruct{
+        a: i32,
+        b: f64,
+        c: String,
+        d: bool,
+        e: TestInnerStruct,
+        list: Vec<i32>,
+        list_obj: Vec<TestInnerStruct>,
+    }
+
+    impl Default for TestStruct{
+        fn default() -> Self{
+            TestStruct{
+                a: 42,
+                b: 42.0,
+                c: "42".to_string(),
+                d: true,
+                e: TestInnerStruct{
+                    a: 42,
+                    b: 42.0,
+                    c: "42".to_string(),
+                    d: true,
+                },
+                list: vec![42, 42, 42],
+                list_obj: vec![TestInnerStruct{a: 42, b: 42.0, c: "42".to_string(), d: true}],
+            }
+        }
+    }
+
+    #[test]
+    pub fn test_datastore_add_json() {
+        let mut datastore = Datastore::new();
+
+        let data = TestStruct::default();
+
+        let topic: TopicKey = "test/topic".into();
+        let time = Timepoint::now();
+        datastore.add_json(&topic, time.clone(), json!(data));
+
+    
+        println!("{:?}", datastore.buckets.keys());
+        assert!(false)
     }
 }

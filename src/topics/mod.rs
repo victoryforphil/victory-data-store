@@ -116,6 +116,19 @@ impl TopicKey {
             .join("/")
     }
 
+    pub fn add_prefix(&self, prefix: TopicKey) -> TopicKey {
+        let mut sections = prefix.sections.clone();
+        sections.extend(self.sections.clone());
+        TopicKey::from_existing(sections)
+        
+    }
+
+    pub fn add_suffix(&self, suffix: TopicKey) -> TopicKey {
+        let mut sections = self.sections.clone();
+        sections.extend(suffix.sections.clone());
+        TopicKey::from_existing(sections)
+    }
+
     pub fn to_string(&self) -> String {
         self.sections
             .iter()
@@ -162,5 +175,27 @@ mod tests {
         assert_eq!(key.sections[0].display_name, "test");
         assert_eq!(key.sections[1].display_name, "test");
         assert_eq!(key.sections[0].id, key.sections[1].id);
+    }
+
+    #[test]
+    fn test_topic_key_display() {
+        let key = TopicKey::from_str("test/test");
+        assert_eq!(key.display_name(), "test/test");
+    }
+
+    #[test]
+    fn test_topic_prefix() {
+        let key = TopicKey::from_str("test/test");
+        let prefix = TopicKey::from_str("prefix/key");
+        let prefixed = key.add_prefix(prefix);
+        assert_eq!(prefixed.display_name(), "prefix/key/test/test");
+    }
+
+    #[test]
+    fn test_topic_suffix() {
+        let key = TopicKey::from_str("test/test");
+        let suffix = TopicKey::from_str("suffix/key");
+        let suffixed = key.add_suffix(suffix);
+        assert_eq!(suffixed.display_name(), "test/test/suffix/key");
     }
 }

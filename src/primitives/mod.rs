@@ -6,6 +6,7 @@ use crate::topics::TopicIDType;
 pub mod blob;
 pub mod integer;
 pub mod string;
+pub mod json;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Primitives {
@@ -19,3 +20,5 @@ pub enum Primitives {
     List(Vec<Primitives>),
     Reference(TopicIDType),
 }
+
+
