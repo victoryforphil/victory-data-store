@@ -18,7 +18,7 @@ fn main() {
 
 #[divan::bench]
 fn bench_to_map_rate(bencher: divan::Bencher) {
-    let len: usize = 100;
+    let len: usize = 500;
 
     bencher
         .with_inputs(|| -> Vec<BigState> { vec![BigState::new(); len] })
@@ -35,7 +35,7 @@ fn bench_to_map_rate(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn bench_from_map_rate(bencher: divan::Bencher) {
-    let len: usize = 100;
+    let len: usize = 500;
 
     bencher
         .with_inputs(|| -> Vec<HashMap<Arc<TopicKey>, Primitives>> {

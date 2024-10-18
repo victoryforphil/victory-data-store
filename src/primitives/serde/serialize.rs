@@ -240,7 +240,7 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
         // Create a new StructType and serialize it
         let mut new_prefix = self.prefix.clone();
         new_prefix.add_suffix_mut(TopicKey::from_existing(vec![
-            TopicKeySection::new_generate("_type"),
+            TopicKeySection::new_generate("_type").into_handle()
         ]));
         self.map
             .insert(new_prefix.into(), Primitives::StructType(name.to_string()));

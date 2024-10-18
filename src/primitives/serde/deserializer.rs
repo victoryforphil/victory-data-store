@@ -547,7 +547,7 @@ impl<'de, 'a> MapAccess<'de> for StructAccess<'a, 'de> {
     {
         let key = self.fields[self.field_index - 1];
         self.de.enter(&TopicKey::from_existing(vec![
-            TopicKeySection::new_generate(key),
+            TopicKeySection::new_generate(key).into_handle()
         ]));
         let value = seed.deserialize(&mut *self.de)?;
         self.de.exit();

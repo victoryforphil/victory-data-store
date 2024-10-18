@@ -13,7 +13,7 @@ pub struct TopicKeySection {
     pub id: TopicIDType,
     pub display_name: String,
 }
-
+pub type TopicKeySectionHandle = Arc<TopicKeySection>;
 impl Hash for TopicKeySection {
     #[instrument(skip_all)]
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -25,6 +25,14 @@ impl TopicKeySection {
     #[instrument(skip_all)]
     pub fn new_existing(id: TopicIDType, display_name: String) -> TopicKeySection {
         TopicKeySection { id, display_name }
+    }
+
+    pub fn handle_(&self) -> TopicKeySectionHandle {
+        Arc::new(self.clone())
+    }
+
+    pub fn into_handle(self) -> TopicKeySectionHandle {
+        Arc::new(self)
     }
     #[instrument(skip_all)]
     pub fn new_generate(display_name: &str) -> TopicKeySection {
@@ -39,7 +47,7 @@ impl TopicKeySection {
 }
 #[derive(Clone, Eq, Serialize, Deserialize)]
 pub struct TopicKey {
-    pub sections: Vec<TopicKeySection>,
+    pub sections: Vec<TopicKeySectionHandle>,
 }
 
 // Implement string formatting / printing (dispaly name)
@@ -116,17 +124,16 @@ impl TopicKeyProvider for TopicKey {
 impl TopicKey {
     #[instrument(skip_all)]
     pub fn from_str(display_name: &str) -> TopicKey {
-        let sections: Vec<TopicKeySection> = display_name
+        let sections: Vec<TopicKeySectionHandle> = display_name
             .split("/")
             .filter(|s| !s.is_empty())
-            .map(|s| TopicKeySection::new_generate(s))
-            //Filter out empty strings
+            .map(|s| TopicKeySection::new_generate(s).into_handle())
             .collect();
         TopicKey { sections }
     }
 
     #[instrument(skip_all)]
-    pub fn from_existing(sections: Vec<TopicKeySection>) -> TopicKey {
+    pub fn from_existing(sections: Vec<TopicKeySectionHandle>) -> TopicKey {
         TopicKey { sections }
     }
 
