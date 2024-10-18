@@ -1,5 +1,5 @@
 use log::trace;
-use serde::de::{self, Deserialize, Deserializer, IntoDeserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, Deserializer, IntoDeserializer, MapAccess, SeqAccess, Visitor};
 use std::collections::{HashMap, HashSet};
 use tracing::instrument;
 
@@ -7,7 +7,8 @@ use crate::{
     primitives::Primitives,
     topics::{TopicKey, TopicKeyHandle, TopicKeySection},
 };
-
+#[allow(unused_imports)]
+#[allow(unused_variables)]
 pub struct PrimitiveDeserializer<'de> {
     flat_map: &'de HashMap<TopicKeyHandle, Primitives>,
     path: TopicKey,
@@ -302,7 +303,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if let Some(primitive) = self.get_value() {
+        if let Some(_primitive) = self.get_value() {
             visitor.visit_some(self)
         } else {
             visitor.visit_none()
@@ -322,7 +323,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
 
     fn deserialize_unit_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -337,7 +338,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
 
     fn deserialize_newtype_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -359,8 +360,8 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
 
     fn deserialize_tuple_struct<V>(
         self,
-        name: &'static str,
-        len: usize,
+        _name: &'static str,
+        _len: usize,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -368,15 +369,15 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     {
         visitor.visit_seq(SeqAccessImpl {
             de: self,
-            indices: (0..len).collect(),
+            indices: (0.._len).collect(),
             index: 0,
         })
     }
     #[instrument(skip_all, name = "PrimitiveDeserializer::deserialize_enum")]
     fn deserialize_enum<V>(
         self,
-        name: &'static str,
-        variants: &'static [&'static str],
+        _name: &'static str,
+        _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where

@@ -459,7 +459,6 @@ mod tests {
     }
     #[test]
     pub fn test_dataview_add_latest() {
-        let datastore = Datastore::new();
         let topic: TopicKey = "/test/topic".into();
 
         let test_struct = TestStructA {
