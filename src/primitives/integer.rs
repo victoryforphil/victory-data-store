@@ -14,7 +14,7 @@ impl From<u32> for Primitives {
 
 impl From<i64> for Primitives {
     fn from(value: i64) -> Self {
-        Primitives::Integer(value as i64)
+        Primitives::Integer(value)
     }
 }
 
@@ -110,7 +110,7 @@ impl From<Primitives> for u32 {
 impl From<Primitives> for i64 {
     fn from(value: Primitives) -> Self {
         match value {
-            Primitives::Integer(v) => v as i64,
+            Primitives::Integer(v) => v,
             _ => panic!("Cannot convert {:?} to i64", value),
         }
     }
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn test_conversion_signed() {
-        let value = Primitives::Integer(-42 as i64);
+        let value = Primitives::Integer(-42_i64);
         let i64_value: i64 = value.clone().into();
         assert_eq!(i64_value, -42);
 

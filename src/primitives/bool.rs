@@ -29,9 +29,9 @@ mod tests {
         assert_eq!(primitive, Primitives::Boolean(false));
         let value = Primitives::Boolean(true);
         let bool_value: bool = value.into();
-        assert_eq!(bool_value, true);
+        assert!(bool_value);
         let value = Primitives::Boolean(false);
         let bool_value: bool = value.into();
-        assert_eq!(bool_value, false);
+        assert!(!bool_value);
     }
 }

@@ -51,7 +51,7 @@ fn bench_from_map_rate(bencher: divan::Bencher) {
         })
         .bench_refs(|s: &mut Vec<HashMap<Arc<TopicKey>, Primitives>>| {
             s.iter().map(|m| {
-                let mut deserializer = PrimitiveDeserializer::new(&m);
+                let mut deserializer = PrimitiveDeserializer::new(m);
                 let bs: BigState = Deserialize::deserialize(&mut deserializer).unwrap();
                 bs  
             })

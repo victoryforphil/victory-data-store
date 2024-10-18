@@ -1,6 +1,6 @@
 use log::trace;
 use serde::de::{self, Deserialize, Deserializer, IntoDeserializer, MapAccess, SeqAccess, Visitor};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use tracing::instrument;
 
 use crate::{
@@ -350,11 +350,11 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        Ok(visitor.visit_seq(SeqAccessImpl {
+        visitor.visit_seq(SeqAccessImpl {
             de: self,
             indices: (0..len).collect(),
             index: 0,
-        })?)
+        })
     }
 
     fn deserialize_tuple_struct<V>(
@@ -366,11 +366,11 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        Ok(visitor.visit_seq(SeqAccessImpl {
+        visitor.visit_seq(SeqAccessImpl {
             de: self,
             indices: (0..len).collect(),
             index: 0,
-        })?)
+        })
     }
     #[instrument(skip_all, name = "PrimitiveDeserializer::deserialize_enum")]
     fn deserialize_enum<V>(
@@ -452,7 +452,7 @@ impl<'de, 'a> de::VariantAccess<'de> for VariantAccessImpl<'a, 'de> {
         let indices = self.de.collect_sequence_indices(&self.de.path);
         let value = visitor.visit_seq(SeqAccessImpl {
             de: self.de,
-            indices: indices,
+            indices,
             index: 0,
         })?;
         self.de.exit();
@@ -595,7 +595,7 @@ impl<'de, 'a> MapAccess<'de> for MapAccessImpl<'a, 'de> {
     where
         K: de::DeserializeSeed<'de>,
     {
-        if let Some(key) = self.keys.iter().skip(self.index).next() {
+        if let Some(key) = self.keys.iter().nth(self.index) {
             self.index += 1;
             seed.deserialize(key.display_name().into_deserializer())
                 .map(Some)
@@ -614,8 +614,8 @@ impl<'de, 'a> MapAccess<'de> for MapAccessImpl<'a, 'de> {
         let value = seed.deserialize(&mut *self.de)?;
         self.de.exit();
         Ok(value) */
-        let key = self.keys.iter().skip(self.index - 1).next().unwrap();
-        self.de.enter(&key);
+        let key = self.keys.iter().nth(self.index - 1).unwrap();
+        self.de.enter(key);
 
         let value = seed.deserialize(&mut *self.de)?;
 

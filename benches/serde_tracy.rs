@@ -2,15 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use divan::counter::{BytesCount, ItemsCount};
-use divan::AllocProfiler;
 use serde::Deserialize;
 use victory_data_store::primitives::serde::deserializer::PrimitiveDeserializer;
 use victory_data_store::primitives::Primitives;
 use victory_data_store::topics::TopicKey;
 use victory_data_store::{primitives::serde::serialize::to_map, test_util::BigState};
 
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_tracy::client::ProfiledAllocator;
 
 fn main() {
     // Run registered benchmarks.
@@ -56,7 +53,7 @@ fn bench_from_map_rate(bencher: divan::Bencher) {
         })
         .bench_refs(|s: &mut Vec<HashMap<Arc<TopicKey>, Primitives>>| {
             s.iter().map(|m| {
-                let mut deserializer = PrimitiveDeserializer::new(&m);
+                let mut deserializer = PrimitiveDeserializer::new(m);
                 let bs: BigState = Deserialize::deserialize(&mut deserializer).unwrap();
                 bs  
             })

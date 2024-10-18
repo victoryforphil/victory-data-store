@@ -26,6 +26,12 @@ pub struct BigState {
     pub trajectory: HashMap<String, BigStatePose>,
 }
 
+impl Default for BigState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BigState {
     pub fn new() -> BigState {
         let mut trajectory = HashMap::new();
@@ -34,7 +40,7 @@ impl BigState {
         }
         BigState {
             pose: BigStatePose::default(),
-            trajectory: trajectory,
+            trajectory,
         }
     }
 }

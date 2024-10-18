@@ -22,6 +22,12 @@ pub struct DataView {
     pub maps: BTreeMap<TopicKey, Primitives>,
 }
 
+impl Default for DataView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DataView {
     pub fn new() -> DataView {
         DataView {
@@ -115,6 +121,12 @@ pub enum DatastoreError {
     Generic(String),
     #[error("Bucket not found for topic {0}")]
     BucketNotFound(TopicKey),
+}
+
+impl Default for Datastore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Datastore {
@@ -335,12 +347,12 @@ mod tests {
         let topic = TopicKey::from_str("test/topic");
 
         let bucket_failed = datastore.get_bucket(&topic);
-        assert_eq!(bucket_failed.is_err(), true);
+        assert!(bucket_failed.is_err());
 
         datastore.create_bucket(&topic);
 
         let bucket = datastore.get_bucket(&topic);
-        assert_eq!(bucket.is_ok(), true);
+        assert!(bucket.is_ok());
         assert_eq!(bucket.unwrap().read().unwrap().topic, topic.handle());
     }
 
@@ -400,7 +412,7 @@ mod tests {
         let bucket = bucket.read().unwrap();
         let datapoints = bucket.get_datapoints();
         assert_eq!(datapoints.len(), 1);
-        assert_eq!(datapoints[0].time, time.clone().into());
+        assert_eq!(datapoints[0].time, time.clone());
         assert_eq!(datapoints[0].value, 42.into());
     }
 
@@ -447,7 +459,7 @@ mod tests {
     }
     #[test]
     pub fn test_dataview_add_latest() {
-        let mut datastore = Datastore::new();
+        let datastore = Datastore::new();
         let topic: TopicKey = "/test/topic".into();
 
         let test_struct = TestStructA {

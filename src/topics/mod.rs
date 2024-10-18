@@ -125,7 +125,7 @@ impl TopicKey {
     #[instrument(skip_all)]
     pub fn from_str(display_name: &str) -> TopicKey {
         let sections: Vec<TopicKeySectionHandle> = display_name
-            .split("/")
+            .split('/')
             .filter(|s| !s.is_empty())
             .map(|s| TopicKeySection::new_generate(s).into_handle())
             .collect();

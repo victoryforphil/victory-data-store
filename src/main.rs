@@ -5,6 +5,7 @@ use victory_data_store::{database::Datastore, topics::TopicKey};
 use victory_time_rs::Timepoint;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename = "uav_state")]
+#[derive(Default)]
 pub struct UAVState {
     pub position: Pose,
     pub velocity: Pose,
@@ -34,15 +35,6 @@ impl Default for Pose {
     }
 }
 
-impl Default for UAVState {
-    fn default() -> UAVState {
-        UAVState {
-            position: Pose::default(),
-            velocity: Pose::default(),
-            acceleration: Pose::default(),
-        }
-    }
-}
 
 fn main() {
     env_logger::init();
