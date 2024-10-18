@@ -1,8 +1,12 @@
 use log::trace;
 use serde::{ser, Serialize};
-use std::collections::BTreeMap;
+use std::{collections::HashMap, sync::Arc};
+use tracing::instrument;
 
-use crate::{primitives::{blob::VicBlob, Primitives}, topics::{TopicKey, TopicKeyHandle, TopicKeyProvider}};
+use crate::{
+    primitives::{blob::VicBlob, Primitives},
+    topics::{TopicKey, TopicKeyHandle, TopicKeyProvider, TopicKeySection},
+};
 
 // Define a custom error type for serialization errors
 #[derive(Debug)]
@@ -29,17 +33,17 @@ impl std::error::Error for PrimitiveError {}
 pub type PrimitiveResult<T> = Result<T, PrimitiveError>;
 
 pub struct PrimitiveSerializer {
-    pub prefix: TopicKeyHandle,
-    pub map: BTreeMap<TopicKeyHandle, Primitives>,
+    pub prefix: TopicKey,
+    pub map: HashMap<TopicKeyHandle, Primitives>,
 }
-
-pub fn to_map<T>(value: &T) -> PrimitiveResult<BTreeMap<TopicKeyHandle, Primitives>>
+#[instrument(skip_all)]
+pub fn to_map<T>(value: &T) -> PrimitiveResult<HashMap<TopicKeyHandle, Primitives>>
 where
     T: Serialize,
 {
     let mut serializer = PrimitiveSerializer {
-        prefix: TopicKey::from_str("").handle(),
-        map: BTreeMap::new(),
+        prefix: TopicKey::empty(),
+        map: HashMap::new(),
     };
     value.serialize(&mut serializer)?;
     Ok(serializer.map)
@@ -56,43 +60,43 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     type SerializeMap = SerializeMap<'a>;
     type SerializeStruct = SerializeStruct<'a>;
     type SerializeStructVariant = SerializeStructVariant<'a>;
-
+    #[instrument(skip_all)]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone();
+        let key = self.prefix.clone().into();
         self.map.insert(key, Primitives::Boolean(v));
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone();
+        let key = self.prefix.clone().into();
         self.map.insert(key, Primitives::Integer(v));
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
         self.serialize_i64(v as i64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
         if v <= i64::MAX as u64 {
             self.serialize_i64(v as i64)
@@ -100,51 +104,51 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
             Err(PrimitiveError::Message("u64 value too large".into()))
         }
     }
-
+    #[instrument(skip_all)]
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
         self.serialize_f64(v as f64)
     }
-
+    #[instrument(skip_all)]
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone();
+        let key = self.prefix.clone().into();
         self.map.insert(key, Primitives::Float(v));
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
         self.serialize_str(&v.to_string())
     }
-
+    #[instrument(skip_all)]
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone();
+        let key = self.prefix.clone().into();
         self.map.insert(key, Primitives::Text(v.to_string()));
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone();
+        let key = self.prefix.clone().into();
         self.map
             .insert(key, Primitives::Blob(VicBlob::new_from_data(v.to_vec())));
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
         // Do nothing for None values
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
         T: Serialize,
     {
         value.serialize(self)
     }
-
+    #[instrument(skip_all)]
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
         // Do nothing for unit types
         Ok(())
     }
-
+    #[instrument(skip_all)]
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
         // Do nothing for unit structs
         Ok(())
@@ -156,7 +160,7 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone();
+        let key = self.prefix.clone().into();
         self.map.insert(key, Primitives::Text(variant.to_string()));
         Ok(())
     }
@@ -182,13 +186,9 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     where
         T: Serialize,
     {
-        let current_prefix = self.prefix.clone();
-
-        let new_prefix = self.prefix.display_name() + "/" + variant;
-        let new_prefix = TopicKey::from_str(new_prefix.as_str());
-        self.prefix = new_prefix.handle();
+        self.prefix.add_suffix_mut(TopicKey::from_str(variant));
         value.serialize(&mut *self)?;
-        self.prefix = current_prefix;
+        self.prefix.sections.pop();
         Ok(())
     }
 
@@ -218,8 +218,8 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        let new_prefix= self.prefix.add_suffix(TopicKey::from_str(variant));
-        self.prefix = new_prefix.handle();
+        self.prefix.add_suffix_mut(TopicKey::from_str(variant));
+
         Ok(SerializeSeq {
             ser: self,
             index: 0,
@@ -229,25 +229,26 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         Ok(SerializeMap {
             ser: self,
-            key: None,
+            //key: None,
         })
     }
-
+    #[instrument(skip_all)]
     fn serialize_struct(
         self,
         name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         // Create a new StructType and serialize it
-        let new_prefix = self.prefix.add_suffix(TopicKey::from_str("_type"));
-        self.map.insert(
-            new_prefix.handle(),
-            Primitives::StructType(name.to_string()),
-        );
+        let mut new_prefix = self.prefix.clone();
+        new_prefix.add_suffix_mut(TopicKey::from_existing(vec![
+            TopicKeySection::new_generate("_type"),
+        ]));
+        self.map
+            .insert(new_prefix.into(), Primitives::StructType(name.to_string()));
 
         Ok(SerializeStruct { ser: self })
     }
-
+    #[instrument(skip_all)]
     fn serialize_struct_variant(
         self,
         _name: &'static str,
@@ -257,9 +258,8 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         let current_prefix = self.prefix.clone();
 
-        let new_prefix = self.prefix.add_suffix(TopicKey::from_str(variant));
-        self.prefix = new_prefix.handle();
-        
+        self.prefix.add_suffix_mut(TopicKey::from_str(variant));
+
         Ok(SerializeStructVariant {
             ser: self,
             original_prefix: current_prefix,
@@ -276,17 +276,17 @@ pub struct SerializeSeq<'a> {
 impl<'a> ser::SerializeSeq for SerializeSeq<'a> {
     type Ok = ();
     type Error = PrimitiveError;
-
+    #[instrument(skip_all, name = "SerializeSeq::serialize_element")]
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), PrimitiveError>
     where
         T: Serialize,
     {
-        let current_prefix = self.ser.prefix.clone();
-        let new_prefix = self.ser.prefix.add_suffix(TopicKey::from_str(&self.index.to_string()));
-        self.ser.prefix = new_prefix.handle();
+        self.ser
+            .prefix
+            .add_suffix_mut(TopicKey::from_str(&self.index.to_string()));
         self.index += 1;
         value.serialize(&mut *self.ser)?;
-        self.ser.prefix = current_prefix;
+        self.ser.prefix.sections.pop();
         Ok(())
     }
 
@@ -298,7 +298,7 @@ impl<'a> ser::SerializeSeq for SerializeSeq<'a> {
 impl<'a> ser::SerializeTuple for SerializeSeq<'a> {
     type Ok = ();
     type Error = PrimitiveError;
-
+    #[instrument(skip_all, name = "SerializeTuple::serialize_element")]
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), PrimitiveError>
     where
         T: Serialize,
@@ -306,6 +306,7 @@ impl<'a> ser::SerializeTuple for SerializeSeq<'a> {
         ser::SerializeSeq::serialize_element(self, value)
     }
 
+    #[instrument(skip_all, name = "SerializeTuple::end")]
     fn end(self) -> Result<(), PrimitiveError> {
         ser::SerializeSeq::end(self)
     }
@@ -314,14 +315,14 @@ impl<'a> ser::SerializeTuple for SerializeSeq<'a> {
 impl<'a> ser::SerializeTupleStruct for SerializeSeq<'a> {
     type Ok = ();
     type Error = PrimitiveError;
-
+    #[instrument(skip_all, name = "SerializeTupleStruct::serialize_field")]
     fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), PrimitiveError>
     where
         T: Serialize,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
-
+    #[instrument(skip_all, name = "SerializeTupleStruct::end")]
     fn end(self) -> Result<(), PrimitiveError> {
         ser::SerializeSeq::end(self)
     }
@@ -331,20 +332,16 @@ impl<'a> ser::SerializeTupleVariant for SerializeSeq<'a> {
     type Ok = ();
     type Error = PrimitiveError;
 
+    #[instrument(skip_all, name = "SerializeTupleVariant::serialize_field")]
     fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), PrimitiveError>
     where
         T: Serialize,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
-
+    #[instrument(skip_all, name = "SerializeTupleVariant::end")]
     fn end(self) -> Result<(), PrimitiveError> {
-        let prefix = self.ser.prefix.clone();
-        let mut new_prefix = prefix.key().clone();
-        if !new_prefix.sections.is_empty() {
-            new_prefix.sections.pop();
-        }
-        self.ser.prefix = new_prefix.handle();
+        self.ser.prefix.sections.pop();
         Ok(())
     }
 }
@@ -352,33 +349,30 @@ impl<'a> ser::SerializeTupleVariant for SerializeSeq<'a> {
 // Helper struct for serializing maps
 pub struct SerializeMap<'a> {
     ser: &'a mut PrimitiveSerializer,
-    key: Option<TopicKeyHandle>,
 }
 
 impl<'a> ser::SerializeMap for SerializeMap<'a> {
     type Ok = ();
     type Error = PrimitiveError;
 
+    #[instrument(skip_all, name = "SerializeMap::serialize_key")]
     fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), PrimitiveError>
     where
         T: Serialize,
     {
         let mut key_serializer = KeySerializer::default();
         key.serialize(&mut key_serializer)?;
-        let key = self.ser.prefix.add_suffix(key_serializer.key.key().clone());
-        self.key = Some(key.handle());
+        self.ser.prefix.add_suffix_mut(key_serializer.key);
         Ok(())
     }
 
+    #[instrument(skip_all, name = "SerializeMap::serialize_value")]
     fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), PrimitiveError>
     where
         T: Serialize,
     {
-        let current_prefix = self.ser.prefix.clone();
-        self.ser.prefix = self.key.clone().unwrap();
         value.serialize(&mut *self.ser)?;
-        self.ser.prefix = current_prefix;
-        self.key = None;
+        self.ser.prefix.sections.pop();
         Ok(())
     }
 
@@ -395,7 +389,7 @@ pub struct SerializeStruct<'a> {
 impl<'a> ser::SerializeStruct for SerializeStruct<'a> {
     type Ok = ();
     type Error = PrimitiveError;
-
+    #[instrument(skip_all, name = "SerializeStruct::serialize_field")]
     fn serialize_field<T: ?Sized>(
         &mut self,
         key: &'static str,
@@ -404,15 +398,15 @@ impl<'a> ser::SerializeStruct for SerializeStruct<'a> {
     where
         T: Serialize,
     {
-        let current_prefix = self.ser.prefix.clone();
-        let new_prefix = self.ser.prefix.add_suffix(TopicKey::from_str(key));
-        self.ser.prefix = new_prefix.handle();
+        let key = TopicKey::from_str(key);
+        self.ser.prefix.add_suffix_mut(key);
         value.serialize(&mut *self.ser)?;
-        self.ser.prefix = current_prefix;
+        self.ser.prefix.sections.pop();
 
         Ok(())
     }
 
+    #[instrument(skip_all, name = "SerializeStruct::end")]
     fn end(self) -> Result<(), PrimitiveError> {
         Ok(())
     }
@@ -421,13 +415,13 @@ impl<'a> ser::SerializeStruct for SerializeStruct<'a> {
 // Helper struct for serializing struct variants
 pub struct SerializeStructVariant<'a> {
     ser: &'a mut PrimitiveSerializer,
-    original_prefix: TopicKeyHandle,
+    original_prefix: TopicKey,
 }
 
 impl<'a> ser::SerializeStructVariant for SerializeStructVariant<'a> {
     type Ok = ();
     type Error = PrimitiveError;
-
+    #[instrument(skip_all, name = "SerializeStructVariant::serialize_field")]
     fn serialize_field<T: ?Sized>(
         &mut self,
         key: &'static str,
@@ -436,15 +430,14 @@ impl<'a> ser::SerializeStructVariant for SerializeStructVariant<'a> {
     where
         T: Serialize,
     {
-        let current_prefix = self.ser.prefix.clone();
-
-        let new_prefix = self.ser.prefix.add_suffix(TopicKey::from_str(key));
-        self.ser.prefix = new_prefix.handle();
+        let key = TopicKey::from_str(key);
+        let n_sec = self.ser.prefix.sections.len();
+        self.ser.prefix.add_suffix_mut(key);
         value.serialize(&mut *self.ser)?;
-        self.ser.prefix = current_prefix;
+        self.ser.prefix.sections.truncate(n_sec);
         Ok(())
     }
-
+    #[instrument(skip_all, name = "SerializeStructVariant::end")]
     fn end(self) -> Result<(), PrimitiveError> {
         self.ser.prefix = self.original_prefix.clone();
         Ok(())
@@ -454,13 +447,13 @@ impl<'a> ser::SerializeStructVariant for SerializeStructVariant<'a> {
 // Serializer for map keys
 
 pub struct KeySerializer {
-    key: TopicKeyHandle,
+    key: TopicKey,
 }
 
 impl Default for KeySerializer {
     fn default() -> Self {
         KeySerializer {
-            key: TopicKey::from_str("").handle(),
+            key: TopicKey::empty(),
         }
     }
 }
@@ -476,9 +469,9 @@ impl<'a> ser::Serializer for &'a mut KeySerializer {
     type SerializeMap = Impossible<(), PrimitiveError>;
     type SerializeStruct = Impossible<(), PrimitiveError>;
     type SerializeStructVariant = Impossible<(), PrimitiveError>;
-
+    #[instrument(skip_all, name = "KeySerializer::serialize_str")]
     fn serialize_str(self, value: &str) -> Result<(), PrimitiveError> {
-        self.key = TopicKey::from_str(value).handle();
+        self.key = TopicKey::from_str(value);
         Ok(())
     }
 
@@ -792,12 +785,12 @@ mod tests_serde {
         a: i32,
         b: TestSimpleStruct,
         c: Vec<i32>,
-        d: BTreeMap<String, TestSimpleStruct>,
+        d: HashMap<String, TestSimpleStruct>,
     }
 
     impl Default for ComplexStruct {
         fn default() -> Self {
-            let mut map = BTreeMap::new();
+            let mut map = HashMap::new();
             map.insert("test_1".to_string(), TestSimpleStruct::default());
             map.insert("test_2".to_string(), TestSimpleStruct::default());
             ComplexStruct {
@@ -818,7 +811,6 @@ mod tests_serde {
         assert!(result.is_ok());
         let map = result.unwrap();
         assert_eq!(map.len(), 3);
-
     }
 
     #[test]
@@ -827,6 +819,5 @@ mod tests_serde {
         let result = to_map(&test_struct);
         assert!(result.is_ok());
         let map = result.unwrap();
-     
     }
 }

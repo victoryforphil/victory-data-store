@@ -79,7 +79,7 @@ mod tests {
         };
 
         let serialized = to_map(&complex);
-       
+
         assert!(serialized.is_ok());
         let serialized = serialized.unwrap();
         trace!("Test serialized {:#?}", serialized);

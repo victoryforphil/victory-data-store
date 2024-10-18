@@ -1,11 +1,13 @@
 use std::{
+    cell::RefCell,
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
 };
 
 use serde::{Deserialize, Serialize};
+use tracing::{instrument, Span};
 
-pub type TopicIDType = String;
+pub type TopicIDType = u64;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopicKeySection {
@@ -14,20 +16,26 @@ pub struct TopicKeySection {
 }
 
 impl Hash for TopicKeySection {
+    #[instrument(skip_all)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
 impl TopicKeySection {
+    #[instrument(skip_all)]
     pub fn new_existing(id: TopicIDType, display_name: String) -> TopicKeySection {
         TopicKeySection { id, display_name }
     }
-
-    pub fn new_generate(display_name: String) -> TopicKeySection {
-        let mut id: String = display_name.to_ascii_lowercase();
-     
-        TopicKeySection { id, display_name }
+    #[instrument(skip_all)]
+    pub fn new_generate(display_name: &str) -> TopicKeySection {
+        let mut hasher = DefaultHasher::new();
+        display_name.hash(&mut hasher);
+        let id = hasher.finish();
+        TopicKeySection {
+            id,
+            display_name: display_name.to_string(),
+        }
     }
 }
 #[derive(Clone, Eq, Serialize, Deserialize)]
@@ -37,18 +45,21 @@ pub struct TopicKey {
 
 // Implement string formatting / printing (dispaly name)
 impl std::fmt::Display for TopicKey {
+    #[instrument(skip_all, name = "TopicKey::fmt")]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.display_name())
     }
 }
 
 impl std::fmt::Debug for TopicKey {
+    #[instrument(skip_all, name = "TopicKey::fmt")]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.display_name())
     }
 }
 
 impl Hash for TopicKey {
+    #[instrument(skip_all)]
     fn hash<H: Hasher>(&self, state: &mut H) {
         for section in &self.sections {
             section.id.hash(state);
@@ -57,18 +68,21 @@ impl Hash for TopicKey {
 }
 
 impl Ord for TopicKey {
+    #[instrument(skip_all)]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.display_name().cmp(&other.display_name())
     }
 }
 
 impl PartialOrd for TopicKey {
+    #[instrument(skip_all)]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl PartialEq for TopicKey {
+    #[instrument(skip_all)]
     fn eq(&self, other: &Self) -> bool {
         self.id() == other.id()
     }
@@ -77,6 +91,7 @@ pub type TopicKeyHandle = Arc<TopicKey>;
 
 pub trait TopicKeyProvider {
     fn key(&self) -> &TopicKey;
+    #[instrument(skip_all)]
     fn handle(&self) -> TopicKeyHandle {
         Arc::new(self.key().clone())
     }
@@ -95,42 +110,60 @@ impl TopicKeyProvider for TopicKey {
 }
 
 impl TopicKey {
+    #[instrument(skip_all)]
     pub fn from_str(display_name: &str) -> TopicKey {
         let sections: Vec<TopicKeySection> = display_name
             .split("/")
-            .map(|s| TopicKeySection::new_generate(s.to_string()))
+            .map(|s| TopicKeySection::new_generate(s))
+            .filter(|s| !s.display_name.is_empty())
             //Filter out empty strings
-            .filter(|s| !s.id.is_empty())
             .collect();
         TopicKey { sections }
     }
 
+    #[instrument(skip_all)]
     pub fn from_existing(sections: Vec<TopicKeySection>) -> TopicKey {
         TopicKey { sections }
     }
 
+    #[instrument(skip_all)]
+    pub fn empty() -> TopicKey {
+        TopicKey { sections: vec![] }
+    }
+    #[instrument(skip_all)]
     pub fn display_name(&self) -> String {
         self.sections
             .iter()
             .map(|s| s.display_name.to_string())
             .collect::<Vec<String>>()
             .join("/")
-            
     }
-
+    #[instrument(skip_all, name = "TopicKey::to_string")]
     pub fn to_string(&self) -> String {
         self.sections
             .iter()
-            .map(|s| s.id.clone())
+            .map(|s| s.id.to_string())
             .collect::<Vec<String>>()
             .join("/")
     }
+    #[instrument(skip_all)]
     pub fn add_prefix(&self, prefix: TopicKey) -> TopicKey {
         TopicKey {
-            sections: prefix.sections.into_iter().chain(self.sections.clone()).collect(),
+            sections: prefix
+                .sections
+                .into_iter()
+                .chain(self.sections.clone())
+                .collect(),
         }
     }
 
+    #[instrument(skip_all)]
+    pub fn add_prefix_mut(&mut self, prefix: TopicKey) {
+        for section in prefix.sections.into_iter().rev() {
+            self.sections.insert(0, section);
+        }
+    }
+    #[instrument(skip_all)]
     pub fn remove_prefix(&self, prefix: TopicKey) -> Option<TopicKey> {
         if !self.is_child_of(&prefix) {
             return None;
@@ -139,14 +172,27 @@ impl TopicKey {
         let sections = self.sections[prefix.sections.len()..].to_vec();
         Some(TopicKey::from_existing(sections))
     }
-    pub fn add_suffix(&self, suffix: TopicKey) -> TopicKey {
-            let mut sections = self.sections.clone();
-            sections.extend(suffix.sections);
-            TopicKey::from_existing(sections)
+
+    pub fn add_suffix_owned(mut self, suffix: TopicKey) -> TopicKey {
+        self.add_suffix_mut(suffix);
+        self
     }
 
-    pub fn remove_suffix(&self, suffix: TopicKey) -> Option<TopicKey> {
-        if !self.is_parent_of(&suffix) {
+    #[instrument(skip_all)]
+    pub fn add_suffix(&self, suffix: TopicKey) -> TopicKey {
+        let mut new_key = self.clone();
+        new_key.add_suffix_mut(suffix);
+        new_key
+    }
+
+    #[instrument(skip_all)]
+    pub fn add_suffix_mut(&mut self, suffix: TopicKey) {
+        self.sections.extend(suffix.sections);
+    }
+
+    #[instrument(skip_all)]
+    pub fn remove_suffix(&self, suffix: &TopicKey) -> Option<TopicKey> {
+        if !self.is_parent_of(suffix) {
             return None;
         }
 
@@ -154,6 +200,7 @@ impl TopicKey {
         Some(TopicKey::from_existing(sections))
     }
 
+    #[instrument(skip_all)]
     pub fn is_child_of(&self, parent: &TopicKey) -> bool {
         if self.sections.len() <= parent.sections.len() {
             return false;
@@ -168,16 +215,18 @@ impl TopicKey {
         true
     }
 
+    #[instrument(skip_all)]
     pub fn is_parent_of(&self, child: &TopicKey) -> bool {
         child.is_child_of(self)
     }
 
+    #[instrument(skip_all)]
     pub fn id(&self) -> TopicIDType {
         let mut hasher = DefaultHasher::new();
         for section in &self.sections {
             section.id.hash(&mut hasher);
         }
-        hasher.finish().to_string()
+        hasher.finish()
     }
 }
 
@@ -198,6 +247,7 @@ impl From<&String> for TopicKey {
         TopicKey::from_str(value)
     }
 }
+
 // Test
 #[cfg(test)]
 mod tests {

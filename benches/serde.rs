@@ -1,7 +1,7 @@
 use divan::counter::{BytesCount, CharsCount, ItemsCount};
-use victory_data_store::{primitives::serde::serialize::to_map, test_util::BigState};
 use divan::AllocProfiler;
 use std::collections::*;
+use victory_data_store::{primitives::serde::serialize::to_map, test_util::BigState};
 
 #[global_allocator]
 static ALLOC: AllocProfiler = AllocProfiler::system();
@@ -15,10 +15,7 @@ fn bench_to_map_rate(bencher: divan::Bencher) {
     let len: usize = 100;
 
     bencher
-       
-        .with_inputs(|| -> Vec<BigState> {
-            vec![BigState::new(); len]
-        })
+        .with_inputs(|| -> Vec<BigState> { vec![BigState::new(); len] })
         .input_counter(|s: &Vec<BigState>| {
             // Changes based on input.
             BytesCount::of_iter(s.iter())
@@ -27,8 +24,5 @@ fn bench_to_map_rate(bencher: divan::Bencher) {
             // Changes based on input.
             ItemsCount::of_iter(s.iter())
         })
-        .bench_refs(|s: &mut Vec<BigState>| {
-            to_map(s).unwrap()
-        });
+        .bench_refs(|s: &mut Vec<BigState>| to_map(s).unwrap());
 }
-

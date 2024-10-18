@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
-pub struct BigStateVector{
+pub struct BigStateVector {
     pub x: f32,
     pub y: f32,
     pub z: f32,
-   // pub w: Option<f32>,
+    // pub w: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
-pub struct BigStatePose{
+pub struct BigStatePose {
     pub position: BigStateVector,
     pub orientation: BigStateVector,
     pub linear_velocity: BigStateVector,
@@ -21,18 +21,18 @@ pub struct BigStatePose{
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BigState{
+pub struct BigState {
     pub pose: BigStatePose,
     pub trajectory: HashMap<String, BigStatePose>,
 }
 
-impl BigState{
-    pub fn new() -> BigState{
+impl BigState {
+    pub fn new() -> BigState {
         let mut trajectory = HashMap::new();
-        for i in 0..10{
+        for i in 0..10 {
             trajectory.insert(i.to_string(), BigStatePose::default());
         }
-        BigState{
+        BigState {
             pose: BigStatePose::default(),
             trajectory: trajectory,
         }

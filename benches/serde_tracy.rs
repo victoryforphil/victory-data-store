@@ -1,8 +1,8 @@
 use divan::counter::{BytesCount, CharsCount, ItemsCount};
 use divan::AllocProfiler;
-use tracing_tracy::client::ProfiledAllocator;
 use std::collections::*;
 use tracing_subscriber::layer::SubscriberExt;
+use tracing_tracy::client::ProfiledAllocator;
 use victory_data_store::{primitives::serde::serialize::to_map, test_util::BigState};
 #[global_allocator]
 static GLOBAL: ProfiledAllocator<std::alloc::System> =
