@@ -141,7 +141,7 @@ impl TopicKey {
     }
     pub fn add_suffix(&self, suffix: TopicKey) -> TopicKey {
             let mut sections = self.sections.clone();
-            sections.extend(suffix.sections.clone());
+            sections.extend(suffix.sections);
             TopicKey::from_existing(sections)
     }
 

@@ -7,7 +7,7 @@ pub struct BigStateVector{
     pub x: f32,
     pub y: f32,
     pub z: f32,
-    pub w: Option<f32>,
+   // pub w: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]

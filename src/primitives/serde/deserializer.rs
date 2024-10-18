@@ -19,14 +19,11 @@ impl<'de> PrimitiveDeserializer<'de> {
 
     fn get_value(&self) -> Option<&Primitives> {
         let value = self.flat_map.get(&self.path);
-        trace!("[get_value] path: {:?}, value: {:?}, keys: {:#?}", self.path, value, self.flat_map.keys());
         value
     }
 
     fn enter(&mut self, key: &TopicKey) {
-        
-        self.path = self.path.add_suffix(key.clone());
-        trace!("[enter] key: {:?}, path: {:?}", key, self.path);
+        self.path.sections.extend(key.sections.clone());
     }
 
     fn exit(&mut self) {
@@ -73,7 +70,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     
         let res = visitor.visit_map(StructAccess {
             de: self,
-            fields: fields.iter().cloned().collect(),
+            fields: fields.to_vec(),
             field_index: 0,
         });
        
@@ -84,8 +81,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let prefix = self.path.clone();
-        let indices = self.collect_sequence_indices(&prefix);
+        let indices = self.collect_sequence_indices(&self.path);
         let seq_access = SeqAccessImpl {
             de: self,
             indices,
@@ -98,9 +94,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut PrimitiveDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let prefix = self.path.clone();
-        let keys = self.collect_map_keys(&prefix);
-        trace!("[deserialize_map] keys: {:?}", keys);
+        let keys = self.collect_map_keys(&self.path);
         let map_access = MapAccessImpl {
             de: self,
             keys,
@@ -463,7 +457,7 @@ impl<'de, 'a> de::VariantAccess<'de> for VariantAccessImpl<'a, 'de> {
         self.de.enter(&TopicKey::from_str("")); // Entering empty string to append '/' to path
         let value = visitor.visit_map(StructAccess {
             de: self.de,
-            fields: _fields.iter().cloned().collect(),
+            fields: _fields.to_vec(),
             field_index: 0,
         })?;
         self.de.exit();
@@ -476,8 +470,10 @@ impl<'de, 'a> PrimitiveDeserializer<'de> {
         let mut indices = Vec::new(); 
         for key in self.flat_map.keys() {
             if key.is_child_of(prefix) {
-                let remainder = &key.remove_prefix(prefix.clone()).unwrap();
-                if let Ok(idx) = remainder.display_name().parse::<usize>() {
+                let prefix_str = prefix.display_name();
+                let key_str = key.display_name();
+                let remainder = key_str.replace(&prefix_str, "");
+                if let Ok(idx) = remainder.parse::<usize>() {
                     indices.push(idx);
                 }
             }
@@ -495,10 +491,9 @@ impl<'de, 'a> PrimitiveDeserializer<'de> {
             if key.is_child_of(prefix) {
                 let remainder = &key.remove_prefix(prefix.clone()).unwrap();
                 let remainder = TopicKey::from_existing(vec![remainder.sections[0].clone()]);
-                keys.insert(remainder.clone());
+                keys.insert(remainder);
             }
         }
-        trace!("[collect_map_keys] keys: {:?}", keys);
         keys
     }
 }
