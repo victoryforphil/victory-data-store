@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::{
     primitives::Primitives,
-    topics::{TopicKey, TopicKeyHandle, TopicKeyProvider},
+    topics::{TopicKey, TopicKeyHandle},
 };
 
 pub struct PrimitiveDeserializer<'de> {

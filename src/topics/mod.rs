@@ -1,11 +1,10 @@
 use std::{
-    cell::RefCell,
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
 };
 
 use serde::{Deserialize, Serialize};
-use tracing::{instrument, Span};
+use tracing::instrument;
 
 pub type TopicIDType = u64;
 

@@ -187,7 +187,7 @@ impl Datastore {
                     value.topic.key(),
                     value.value
                 );
-                let mut key = value
+                let key = value
                     .topic
                     .key()
                     .remove_prefix(topic.key().clone())

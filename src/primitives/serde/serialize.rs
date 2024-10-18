@@ -1,6 +1,5 @@
-use log::trace;
 use serde::{ser, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 use tracing::instrument;
 
 use crate::{
