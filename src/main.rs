@@ -36,7 +36,6 @@ impl Default for Pose {
     }
 }
 
-
 fn main() {
     env_logger::init();
 

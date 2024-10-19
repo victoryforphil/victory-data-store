@@ -501,7 +501,6 @@ impl<'de, 'a> PrimitiveDeserializer<'de> {
         let mut keys = HashSet::new();
 
         for key in self.flat_map.keys() {
-            
             if key.is_child_of(prefix) {
                 let remainder = key
                     .sections
@@ -547,9 +546,8 @@ impl<'de, 'a> MapAccess<'de> for StructAccess<'a, 'de> {
         V: de::DeserializeSeed<'de>,
     {
         let key = self.fields[self.field_index - 1];
-        self.de.enter(&TopicKey::from_existing(vec![
-            TopicKeySection::new_generate(key).into_handle()
-        ]));
+
+        self.de.path.add_suffix_mut(&TopicKey::from_str(key));
         let value = seed.deserialize(&mut *self.de)?;
         self.de.exit();
         Ok(value)

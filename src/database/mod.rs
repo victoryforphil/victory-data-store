@@ -9,17 +9,17 @@ use crate::{
 };
 use log::trace;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use victory_time_rs::Timepoint;
 
 #[derive(Debug, Clone)]
 pub struct Datastore {
-    buckets: BTreeMap<TopicKeyHandle, BucketHandle>,
+    buckets: HashMap<TopicKeyHandle, BucketHandle>,
 }
 #[derive(Debug, Clone)]
 pub struct DataView {
-    pub maps: BTreeMap<TopicKey, Primitives>,
+    pub maps: HashMap<TopicKey, Primitives>,
 }
 
 impl Default for DataView {
@@ -31,7 +31,7 @@ impl Default for DataView {
 impl DataView {
     pub fn new() -> DataView {
         DataView {
-            maps: BTreeMap::new(),
+            maps: HashMap::new(),
         }
     }
     pub fn add_query(
@@ -132,7 +132,7 @@ impl Default for Datastore {
 impl Datastore {
     pub fn new() -> Datastore {
         Datastore {
-            buckets: BTreeMap::new(),
+            buckets: HashMap::new(),
         }
     }
 
@@ -275,8 +275,8 @@ impl Datastore {
 
     pub fn get_latest_primitives<T: TopicKeyProvider>(
         &self,
-        topics: BTreeSet<T>,
-    ) -> BTreeMap<TopicKey, Primitives> {
+        topics: HashSet<T>,
+    ) -> HashMap<TopicKey, Primitives> {
         topics
             .iter()
             .filter_map(|t| self.get_latest_primitive(t).map(|p| (t.key().clone(), p)))
@@ -301,10 +301,10 @@ impl Datastore {
         self.buckets.keys().cloned().collect()
     }
 
-    pub fn get_all_display_names(&self) -> BTreeSet<String> {
+    pub fn get_all_display_names(&self) -> HashMap<TopicKeyHandle, String> {
         self.buckets
             .keys()
-            .map(|k| k.key().display_name())
+            .map(|k| (k.clone(), k.key().display_name()))
             .collect()
     }
     pub fn get_updated_keys<T: TopicKeyProvider>(

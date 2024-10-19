@@ -1,11 +1,16 @@
 use serde::{ser, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tracing::instrument;
 
 use crate::{
     primitives::{blob::VicBlob, Primitives},
     topics::{TopicKey, TopicKeyHandle, TopicKeySection},
 };
+
+// Create a global copy for _type using a lazy static
+lazy_static::lazy_static! {
+    static ref _TYPE_KEY: TopicKey = TopicKey::from_str("_type");
+}
 #[allow(unused_imports)]
 #[allow(unused_variables)]
 // Define a custom error type for serialization errors
@@ -34,7 +39,7 @@ pub type PrimitiveResult<T> = Result<T, PrimitiveError>;
 
 pub struct PrimitiveSerializer {
     pub prefix: TopicKey,
-    pub map: HashMap<TopicKeyHandle, Primitives>,
+    pub map: Vec<(TopicKeyHandle, Primitives)>,
 }
 #[allow(unused_imports)]
 #[allow(unused_variables)]
@@ -45,10 +50,11 @@ where
 {
     let mut serializer = PrimitiveSerializer {
         prefix: TopicKey::empty(),
-        map: HashMap::new(),
+        map: Vec::new(),
     };
     value.serialize(&mut serializer)?;
-    Ok(serializer.map)
+    let map = HashMap::from_iter(serializer.map.into_iter());
+    Ok(map)
 }
 
 impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
@@ -64,8 +70,8 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     type SerializeStructVariant = SerializeStructVariant<'a>;
     #[instrument(skip_all)]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone().into();
-        self.map.insert(key, Primitives::Boolean(v));
+        self.map
+            .push((self.prefix.clone().into(), Primitives::Boolean(v)));
         Ok(())
     }
     #[instrument(skip_all)]
@@ -82,8 +88,8 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     }
     #[instrument(skip_all)]
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone().into();
-        self.map.insert(key, Primitives::Integer(v));
+        self.map
+            .push((self.prefix.clone().into(), Primitives::Integer(v)));
         Ok(())
     }
     #[instrument(skip_all)]
@@ -112,8 +118,8 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     }
     #[instrument(skip_all)]
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone().into();
-        self.map.insert(key, Primitives::Float(v));
+        self.map
+            .push((self.prefix.clone().into(), Primitives::Float(v)));
         Ok(())
     }
     #[instrument(skip_all)]
@@ -122,15 +128,16 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     }
     #[instrument(skip_all)]
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone().into();
-        self.map.insert(key, Primitives::Text(v.to_string()));
+        self.map
+            .push((self.prefix.clone().into(), Primitives::Text(v.to_string())));
         Ok(())
     }
     #[instrument(skip_all)]
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone().into();
-        self.map
-            .insert(key, Primitives::Blob(VicBlob::new_from_data(v.to_vec())));
+        self.map.push((
+            self.prefix.clone().into(),
+            Primitives::Blob(VicBlob::new_from_data(v.to_vec())),
+        ));
         Ok(())
     }
     #[instrument(skip_all)]
@@ -162,8 +169,10 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        let key = self.prefix.clone().into();
-        self.map.insert(key, Primitives::Text(variant.to_string()));
+        self.map.push((
+            self.prefix.clone().into(),
+            Primitives::Text(variant.to_string()),
+        ));
         Ok(())
     }
 
@@ -188,7 +197,7 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     where
         T: Serialize,
     {
-        self.prefix.add_suffix_mut(TopicKey::from_str(variant));
+        self.prefix.add_suffix_mut(&TopicKey::from_str(variant));
         value.serialize(&mut *self)?;
         self.prefix.sections.pop();
         Ok(())
@@ -220,7 +229,7 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        self.prefix.add_suffix_mut(TopicKey::from_str(variant));
+        self.prefix.add_suffix_mut(&TopicKey::from_str(variant));
 
         Ok(SerializeSeq {
             ser: self,
@@ -242,11 +251,11 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     ) -> Result<Self::SerializeStruct, Self::Error> {
         // Create a new StructType and serialize it
         let mut new_prefix = self.prefix.clone();
-        new_prefix.add_suffix_mut(TopicKey::from_existing(vec![
-            TopicKeySection::new_generate("_type").into_handle()
-        ]));
-        self.map
-            .insert(new_prefix.into(), Primitives::StructType(name.to_string()));
+        new_prefix.add_suffix_mut(&_TYPE_KEY);
+        self.map.push((
+            new_prefix.clone().into(),
+            Primitives::StructType(name.to_string()),
+        ));
 
         Ok(SerializeStruct { ser: self })
     }
@@ -260,7 +269,7 @@ impl<'a> ser::Serializer for &'a mut PrimitiveSerializer {
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         let current_prefix = self.prefix.clone();
 
-        self.prefix.add_suffix_mut(TopicKey::from_str(variant));
+        self.prefix.add_suffix_mut(&TopicKey::from_str(variant));
 
         Ok(SerializeStructVariant {
             ser: self,
@@ -285,7 +294,7 @@ impl<'a> ser::SerializeSeq for SerializeSeq<'a> {
     {
         self.ser
             .prefix
-            .add_suffix_mut(TopicKey::from_str(&self.index.to_string()));
+            .add_suffix_mut(&TopicKey::from_str(&self.index.to_string()));
         self.index += 1;
         value.serialize(&mut *self.ser)?;
         self.ser.prefix.sections.pop();
@@ -364,7 +373,7 @@ impl<'a> ser::SerializeMap for SerializeMap<'a> {
     {
         let mut key_serializer = KeySerializer::default();
         key.serialize(&mut key_serializer)?;
-        self.ser.prefix.add_suffix_mut(key_serializer.key);
+        self.ser.prefix.add_suffix_mut(&key_serializer.key);
         Ok(())
     }
 
@@ -400,8 +409,7 @@ impl<'a> ser::SerializeStruct for SerializeStruct<'a> {
     where
         T: Serialize,
     {
-        let key = TopicKey::from_str(key);
-        self.ser.prefix.add_suffix_mut(key);
+        self.ser.prefix.add_suffix_mut(&TopicKey::from_str(key));
         value.serialize(&mut *self.ser)?;
         self.ser.prefix.sections.pop();
 
@@ -434,7 +442,7 @@ impl<'a> ser::SerializeStructVariant for SerializeStructVariant<'a> {
     {
         let key = TopicKey::from_str(key);
         let n_sec = self.ser.prefix.sections.len();
-        self.ser.prefix.add_suffix_mut(key);
+        self.ser.prefix.add_suffix_mut(&key);
         value.serialize(&mut *self.ser)?;
         self.ser.prefix.sections.truncate(n_sec);
         Ok(())

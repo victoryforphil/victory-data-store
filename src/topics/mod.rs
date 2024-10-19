@@ -1,5 +1,5 @@
 use std::{
-    hash::{DefaultHasher, Hash, Hasher},
+    hash::{BuildHasher, DefaultHasher, Hash, Hasher},
     sync::Arc,
 };
 
@@ -27,7 +27,7 @@ impl TopicKeySection {
         TopicKeySection { id, display_name }
     }
 
-    pub fn handle_(&self) -> TopicKeySectionHandle {
+    pub fn handle(&self) -> TopicKeySectionHandle {
         Arc::new(self.clone())
     }
 
@@ -38,7 +38,7 @@ impl TopicKeySection {
     pub fn new_generate(display_name: &str) -> TopicKeySection {
         let mut hasher = DefaultHasher::new();
         display_name.hash(&mut hasher);
-        let id = hasher.finish();
+        let id = hasher.finish() as TopicIDType;
         TopicKeySection {
             id,
             display_name: display_name.to_string(),
@@ -185,26 +185,24 @@ impl TopicKey {
     }
 
     pub fn add_suffix_owned(mut self, suffix: TopicKey) -> TopicKey {
-        self.add_suffix_mut(suffix);
+        self.add_suffix_mut(&suffix);
         self
     }
 
     #[instrument(skip_all)]
-    pub fn add_suffix(&self, suffix: TopicKey) -> TopicKey {
+    pub fn add_suffix(&self, suffix: &TopicKey) -> TopicKey {
         let mut new_key = self.clone();
-        new_key.add_suffix_mut(suffix);
+        new_key.add_suffix_mut(&suffix);
         new_key
     }
 
     #[instrument(skip_all)]
-    pub fn add_suffix_mut(&mut self, suffix: TopicKey) {
-        self.sections.extend(suffix.sections);
+    pub fn add_suffix_mut(&mut self, suffix: &TopicKey) {
+        self.sections.extend(suffix.sections.clone());
     }
 
     #[instrument(skip_all)]
     pub fn remove_suffix(&self, suffix: &TopicKey) -> Option<TopicKey> {
-      
-
         let sections = self.sections[..self.sections.len() - suffix.sections.len()].to_vec();
         Some(TopicKey::from_existing(sections))
     }
@@ -235,7 +233,7 @@ impl TopicKey {
         for section in &self.sections {
             section.id.hash(&mut hasher);
         }
-        hasher.finish()
+        hasher.finish() as TopicIDType
     }
 }
 
@@ -286,7 +284,7 @@ mod tests {
     fn test_topic_suffix() {
         let key = TopicKey::from_str("test/test");
         let suffix = TopicKey::from_str("suffix/key");
-        let suffixed = key.add_suffix(suffix);
+        let suffixed = key.add_suffix(&suffix);
         assert_eq!(suffixed.display_name(), "test/test/suffix/key");
     }
 }
